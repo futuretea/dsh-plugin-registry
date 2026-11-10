@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<style>
+  :root { --fg: #1f2328; --muted: #656d76; --line: #d0d7de; --bg: #f6f8fa; --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; --info: #0969da; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: var(--fg); background: var(--bg); }
+  header { background: #fff; border-bottom: 1px solid var(--line); padding: 20px 24px; }
+  header h1 { margin: 0 0 4px; font-size: 22px; }
+  header p { margin: 0; color: var(--muted); }
+  .source { margin-top: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .source code { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px 24px; }
+  .toolbar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .toolbar input { flex: 1 1 280px; padding: 8px 12px; font-size: 14px; border: 1px solid var(--line); border-radius: 6px; }
+  .toolbar select { padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  .count { color: var(--muted); margin-bottom: 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .card h2 { margin: 0; font-size: 16px; word-break: break-all; }
+  .card h2 a { color: var(--info); text-decoration: none; }
+  .meta { color: var(--muted); font-size: 12px; }
+  .desc { margin: 0; }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .badge { font-size: 12px; border-radius: 999px; padding: 1px 8px; border: 1px solid currentColor; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); } .info { color: var(--info); } .muted { color: var(--muted); }
+  .keywords { color: var(--muted); font-size: 12px; }
+  .install { font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: var(--bg); border-radius: 6px; padding: 6px 8px; word-break: break-all; }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title"></h1>
+  <p id="description"></p>
+  <div class="source">在 DSH 中添加插件索引源：<code id="index-url"></code></div>
+  <p class="meta" id="generated"></p>
+</header>
+<main>
+  <div class="toolbar">
+    <input id="q" type="search" placeholder="搜索名称、作者、描述或关键词" aria-label="搜索插件">
+    <select id="risk" aria-label="按风险筛选">
+      <option value="">全部风险等级</option>
+      <option value="risk-low">低风险</option>
+      <option value="risk-medium">中风险</option>
+    </select>
+    <select id="origin" aria-label="按来源筛选">
+      <option value="">全部来源</option>
+      <option value="internal">公司自研</option>
+      <option value="external">外部放行</option>
+    </select>
+  </div>
+  <div class="count" id="count" aria-live="polite"></div>
+  <div class="grid" id="list"></div>
+</main>
+<script type="application/json" id="market-data">__DATA__</script>
+<script>
+(() => {
+  const data = JSON.parse(document.getElementById('market-data').textContent);
+  const index = data.index;
+  const labelTitles = index.metadata.labels || {};
+  const zh = (obj) => (obj && (obj.zh || obj.en)) || '';
+  const el = (tag, props = {}, children = []) => {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) node[k] = v;
+    for (const c of children) node.append(c);
+    return node;
+  };
+  const BADGE_CLASS = { 'install-verified': 'ok', 'risk-low': 'ok', 'risk-medium': 'warn', 'risk-high': 'bad', 'risk-critical': 'bad', 'source-internal': 'info', 'source-external': 'muted' };
+  const indexUrl = new URL('index.json', location.href).href;
+
+  document.title = zh(index.title);
+  document.getElementById('title').textContent = zh(index.title);
+  document.getElementById('description').textContent = zh(index.description);
+  document.getElementById('index-url').textContent = indexUrl;
+  document.getElementById('generated').textContent = '最后更新 ' + new Date(data.generatedAt).toLocaleString('zh-CN');
+
+  const installHint = (p) => {
+    const v = p.versions[0];
+    return v.source.type === 'npm' ? 'npm: ' + p.name + '@' + v.version : 'git: ' + v.source.url + ' @ ' + v.source.commit.slice(0, 12);
+  };
+
+  const card = (p) => {
+    const v = p.versions[0];
+    const link = el('a', { href: /^https?:\/\//i.test(p.repository.url) ? p.repository.url : '#', textContent: zh(p.title) || p.name, target: '_blank', rel: 'noopener noreferrer' });
+    const badges = p.metadata.labels.map((l) => el('span', { className: 'badge ' + (BADGE_CLASS[l] || 'muted'), textContent: zh(labelTitles[l]) || l }));
+    const updated = new Date(v.publishTimestamp * 1000).toLocaleDateString('zh-CN');
+    return el('article', { className: 'card' }, [
+      el('h2', {}, [link]),
+      el('div', { className: 'meta', textContent: p.author + ' · v' + v.version + ' · DSH ' + v.engines.dsh + ' · 更新 ' + updated }),
+      el('p', { className: 'desc', textContent: zh(p.description) }),
+      el('div', { className: 'badges' }, badges),
+      p.metadata.keywords.length ? el('div', { className: 'keywords', textContent: '# ' + p.metadata.keywords.join('  # ') }) : '',
+      el('div', { className: 'install', textContent: installHint(p) }),
+    ]);
+  };
+
+  const haystack = (p) => [p.name, zh(p.title), p.author, p.description.en, p.description.zh, ...p.metadata.keywords].join(' ').toLowerCase();
+  const q = document.getElementById('q');
+  const risk = document.getElementById('risk');
+  const origin = document.getElementById('origin');
+  const list = document.getElementById('list');
+  const count = document.getElementById('count');
+
+  const render = () => {
+    const terms = q.value.toLowerCase().split(/\s+/).filter(Boolean);
+    const shown = index.plugins.filter((p) =>
+      terms.every((t) => haystack(p).includes(t)) &&
+      (!risk.value || p.metadata.labels.includes(risk.value)) &&
+      (!origin.value || p.metadata.category === origin.value));
+    list.replaceChildren(...(shown.length ? shown.map(card) : [el('div', { className: 'empty', textContent: '没有匹配的插件' })]));
+    count.textContent = '共 ' + index.plugins.length + ' 个已放行插件，当前显示 ' + shown.length + ' 个';
+  };
+  for (const input of [q, risk, origin]) {
+    input.addEventListener('input', render);
+    input.addEventListener('change', render);
+  }
+  render();
+})();
+</script>
+</body>
+</html>

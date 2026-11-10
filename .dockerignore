@@ -1,0 +1,6 @@
+.git
+.project
+node_modules
+public
+test
+deploy/.env

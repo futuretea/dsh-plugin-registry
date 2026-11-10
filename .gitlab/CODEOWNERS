@@ -1,0 +1,3 @@
+# Replace @dsh-plugin-registry-approvers with the group that approves external plugins.
+[Plugin allowlist]
+/allowlist.json @dsh-plugin-registry-approvers

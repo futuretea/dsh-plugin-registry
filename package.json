@@ -1,0 +1,19 @@
+{
+  "name": "dsh-plugin-registry",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Internal DSH plugin market: discovers, verifies and publishes a DSH-compatible plugin index",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "dsh-plugin-registry": "bin/generate.mjs"
+  },
+  "scripts": {
+    "generate": "node bin/generate.mjs",
+    "test": "node --test \"test/*.test.mjs\"",
+    "test:e2e": "node --test \"test/e2e/*.test.mjs\"",
+    "lint": "node scripts/lint.mjs"
+  }
+}
